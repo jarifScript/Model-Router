@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ModelInfo } from '../core/models'
 import { type ModelListEntry, type ModelSort, type ModelStatusFilter, filterModelEntries, sortModelEntries } from '../core/modelList'
+import { getModelCatalogRequests } from '../core/modelCatalogRequests'
 import { buildModelChatSearch } from '../core/modelChatLink'
 import { MAX_BATCH_MODELS, type BatchModel, requiresPaidTestConfirmation, runModelTestBatch } from '../core/modelTestBatch'
 import { testModel } from '../core/modelTest'
@@ -345,17 +346,8 @@ export default function ModelsPage() {
     return grouped
   }, [providerKeys])
   const catalogRequests = useMemo(() => {
-    const requests: Array<{ providerId: ProviderId; keyId?: string }> = []
-    for (const [providerId, keys] of providerKeysById) {
-      if (providerId === 'openrouter') {
-        requests.push({ providerId })
-      } else {
-        for (const key of keys) requests.push({ providerId, keyId: key.id })
-      }
-    }
-    if (!providerKeysById.has('openrouter')) requests.push({ providerId: 'openrouter' })
-    return requests
-  }, [providerKeysById])
+    return getModelCatalogRequests(providerKeys)
+  }, [providerKeys])
 
   const onCatalogChange = useCallback((key: string, state: CatalogState) => {
     setCatalogs((current) => ({ ...current, [key]: state }))
@@ -363,7 +355,9 @@ export default function ModelsPage() {
 
   const allModels = useMemo(() => {
     const deduplicated = new Map<string, { model: ModelInfo; keyId?: string }>()
-    for (const catalog of Object.values(catalogs)) {
+    for (const request of catalogRequests) {
+      const catalog = catalogs[catalogKey(request.providerId, request.keyId)]
+      if (!catalog) continue
       for (const model of catalog.models) {
         const key = `${model.providerId}:${model.id}`
         const savedKeyId = catalog.keyId
@@ -378,7 +372,7 @@ export default function ModelsPage() {
       favorite: favoriteKeys.has(`${model.providerId}:${model.id}`),
       test: testResults[getModelTestKey(model.providerId, model.id)],
     }))
-  }, [catalogs, favorites, providerKeysById, testResults])
+  }, [catalogRequests, catalogs, favorites, providerKeysById, testResults])
   const routeOrder = useMemo(
     () => backupPlan.targets.map((target) => `${target.provider}:${target.model}`),
     [backupPlan.targets],
@@ -583,7 +577,9 @@ export default function ModelsPage() {
     )
   }
 
-  const catalogErrors = Object.values(catalogs).filter((catalog) => catalog.error)
+  const catalogErrors = catalogRequests
+    .map((request) => catalogs[catalogKey(request.providerId, request.keyId)])
+    .filter((catalog) => catalog?.error)
   const catalogLoading = catalogRequests.some((request) => catalogs[catalogKey(request.providerId, request.keyId)]?.isLoading)
   const providerHasSavedKey = (providerId: ProviderId) => Boolean(providerKeysById.get(providerId)?.length)
 
