@@ -1,0 +1,10 @@
+# Supabase local development configuration.
+
+[functions.route]
+verify_jwt = true
+
+[functions.gateway]
+verify_jwt = false
+
+[functions.gateway-admin]
+verify_jwt = true

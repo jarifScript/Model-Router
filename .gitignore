@@ -1,0 +1,11 @@
+# Generated dependencies and build output.
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+/testing openrouter api key.py
+/tsc_output.txt
+/Screenshot 2026-10-23 211951.png
+.DS_Store
+supabase/.temp/
