@@ -1,6 +1,6 @@
 // Encrypts a provider key in the browser before inserting its ciphertext into Supabase.
 import { useState, type FormEvent } from 'react'
-import { encryptSecret } from '../../core/crypto'
+import { encryptSecretForVault, VaultCryptoError } from '../../core/crypto'
 import { PROVIDER_CONFIGS, type ProviderConfig, type ProviderId } from '../../core/providers'
 import { supabase } from '../../lib/supabase'
 import { useVaultStore } from '../../store/vault'
@@ -67,7 +67,18 @@ export default function AddKeyModal({
       if (userError) throw userError
       if (!user) throw new Error(copy.keys.lockedHint)
 
-      const encrypted = await encryptSecret(apiKey.trim(), passphrase)
+      const { data: canary, error: canaryError } = await supabase
+        .from('vault_meta')
+        .select('kdf_salt, canary_ciphertext, canary_iv')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (canaryError) throw canaryError
+      if (!canary) {
+        setError(copy.secretPassword.setupNeeded)
+        return
+      }
+
+      const encrypted = await encryptSecretForVault(apiKey.trim(), passphrase, canary)
       const { data, error: insertError } = await supabase
         .from('provider_keys')
         .insert({
@@ -96,8 +107,12 @@ export default function AddKeyModal({
       } else {
         onClose()
       }
-    } catch {
-      setError(copy.keys.saveError)
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof VaultCryptoError && caughtError.code === 'passphrase_mismatch'
+          ? copy.keys.secretPasswordMismatch
+          : copy.keys.saveError,
+      )
     } finally {
       setIsSaving(false)
     }

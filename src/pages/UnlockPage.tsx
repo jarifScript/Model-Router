@@ -3,13 +3,13 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
   createVaultCanary,
-  decryptSecret,
   verifyVaultCanary,
   type VaultCanary,
 } from '../core/crypto'
+import { decryptProviderKeys } from '../lib/decryptProviderKeys'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { useVaultStore } from '../store/vault'
-import { isProviderId, type EncryptedProviderKey } from '../types'
+import type { EncryptedProviderKey } from '../types'
 import useAuth from '../hooks/useAuth'
 import { copy } from '../lib/copy'
 
@@ -110,22 +110,22 @@ export default function UnlockPage() {
           .from('provider_keys')
           .select('id, provider, label, ciphertext, iv, salt, created_at')
           .eq('user_id', user.id)
-        if (keysError) throw keysError
+        if (keysError) {
+          setError(copy.secretPassword.keysUnavailable)
+          return
+        }
 
-        const providerKeys = await Promise.all(
-          (data satisfies EncryptedProviderKey[]).map(async (record) => {
-            if (!isProviderId(record.provider)) {
-              throw new Error(copy.errors.unknown)
-            }
-            return {
-              id: record.id,
-              provider: record.provider,
-              label: record.label,
-              apiKey: await decryptSecret(record, passphrase),
-            }
-          }),
+        const { providerKeys, unavailableProviderKeys } = await decryptProviderKeys(
+          data satisfies EncryptedProviderKey[],
+          passphrase,
         )
-        unlock(providerKeys)
+        unlock(providerKeys, unavailableProviderKeys)
+        if (unavailableProviderKeys.length > 0) {
+          setPassphrase('')
+          setConfirmation('')
+          navigate('/providers', { replace: true })
+          return
+        }
       }
 
       setPassphrase('')

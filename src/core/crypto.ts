@@ -18,6 +18,7 @@ export type CryptoErrorCode =
   | 'invalid_input'
   | 'invalid_data'
   | 'authentication_failed'
+  | 'passphrase_mismatch'
   | 'crypto_failure'
 
 export class VaultCryptoError extends Error {
@@ -135,6 +136,17 @@ export async function encryptSecret(
   const salt = randomBytes(16)
   const encrypted = await encryptWithSalt(plaintext, passphrase, salt)
   return { ...encrypted, salt: toBase64(salt) }
+}
+
+export async function encryptSecretForVault(
+  plaintext: string,
+  passphrase: string,
+  canary: VaultCanary,
+): Promise<EncryptedSecret> {
+  if (!await verifyVaultCanary(passphrase, canary)) {
+    throw new VaultCryptoError('The password does not match this vault.', 'passphrase_mismatch')
+  }
+  return encryptSecret(plaintext, passphrase)
 }
 
 export async function decryptSecret(

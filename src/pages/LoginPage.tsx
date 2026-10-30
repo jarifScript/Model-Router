@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import { copy } from '../lib/copy'
+import { getAuthErrorMessage } from '../lib/authErrorMessage'
 
 export default function LoginPage() {
   const { isConfigured, isLoading, user, signInWithEmail, signInWithGitHub, signUpWithEmail } = useAuth()
@@ -34,8 +35,8 @@ export default function LoginPage() {
           setMessage(copy.login.confirmEmail)
         }
       }
-    } catch {
-      setError(copy.login.authError)
+    } catch (authError) {
+      setError(getAuthErrorMessage(authError, mode))
     } finally {
       setIsSubmitting(false)
     }
@@ -47,8 +48,8 @@ export default function LoginPage() {
 
     try {
       await signInWithGitHub()
-    } catch {
-      setError(copy.login.authError)
+    } catch (authError) {
+      setError(getAuthErrorMessage(authError, 'oauth'))
       setIsSubmitting(false)
     }
   }

@@ -31,3 +31,9 @@ export type DecryptedProviderKey = {
   label: string
   apiKey: string
 }
+
+export type UnavailableProviderKey = {
+  id: string
+  provider: string
+  label: string
+}
